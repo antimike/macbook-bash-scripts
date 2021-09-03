@@ -1,0 +1,130 @@
+#!/bin/bash
+
+export INSTALL_LOG="${INSTALL_LOG:-$HOME/.installed/.installed.log}"
+
+_kill_jobs() {
+    kill $(ps -o pid= --ppid $$)
+}
+
+_die() {
+    local -i code=1
+    if [ "$1" = "-e" ]; then
+        code="$2" && shift 2 || exit 255
+    fi
+    printf "$@"
+    _kill_jobs
+    exit $code
+} >&2
+
+_commit_changes() (
+    local -a files=( )
+    local -A opts=(
+        [-m]=msg
+        [-f]=file
+        [-d]=directory
+    )
+
+    while getopts ":m:d:f:" opt; do
+        case "$opt" in
+            -m)
+                ;;
+            -d)
+                ;;
+            -f)
+                ;;
+            *)
+                _die -e -1 "Unrecognized option '$opt' in _commit_changes"
+                return -1
+                ;;
+        esac
+    done
+)
+
+
+_commit_installed() (
+    cd "$(dirname "$INSTALL_LOG")"
+    git status 2>&1 >/dev/null ||
+        _die -e 2 "`pwd` does not appear to be a git repository"
+    git add . && git commit -m "$*"
+    return $?
+)
+
+_debug() {
+    local status=$?
+    if [ -n "$DEBUG" ]; then
+        echo "DEBUG: ${BASH_SOURCE[0]}"
+        # printf '%s\n' "$@" | sed 's/^/	/'
+        for arg in "$@"; do
+            typeset -p "$arg" 2>/dev/null ||
+                echo "$arg"
+        done | sed 's/^/	/'
+    fi
+    return $status
+} >&2
+
+get() (
+    local -i debug="${DEBUG+1}"
+    local -a cmd=( )
+    local -a tags=( )
+    local -a comments=( )
+    local -a installed=( )
+    local -a failed=( )
+
+    _display_results() {
+        cat <<-DISPLAY
+    		installed: ${installed[@]}
+        	failed: ${failed[@]}
+		DISPLAY
+        return ${#failed[@]}
+    }
+
+    _cleanup_and_exit() {
+        local -i status="$1"
+        _display_results
+        exit $1
+    } >&2
+
+    trap "_cleanup_and_exit 'Terminating'" EXIT SIGINT SIGTERM
+    case "$1" in
+        -D)
+            let debug=1
+            ;;
+        dnf)
+            cmd=( "sudo" "dnf" "install" )
+            ;;
+        pip?)
+            cmd=( "$1" "install" "--user" "--upgrade" ) 
+            ;;
+        *)
+            _die -e 1 "Command '$1' not implemented"
+            ;;
+    esac
+    shift 
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -c)
+                comments+=( "$2" )
+                shift 2
+                continue
+                ;;
+            -t)
+                tags+=( "$2" )
+                shift 2
+                continue
+                ;;
+            *)
+                ;;
+        esac 
+        source <({ 
+            echo
+            [ ${#tags} -gt 0 ] && printf '#@%s\n' "${tags[@]}"
+            [ ${#comments} -gt 0 ] && printf '# %s\n' "${comments[@]}" 
+            printf '%s\n' "${cmd[*]} $1" | tee >&1
+        } | tee -a "$INSTALL_LOG") &&
+            installed+=( "$1" ) ||
+            failed+=( "$1" )
+        shift
+    done
+    _display_results
+    return $?
+)
