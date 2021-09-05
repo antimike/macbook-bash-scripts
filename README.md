@@ -66,3 +66,74 @@ unset rc
 
 * Auto-generate Makefiles from YAML / Markdown dependency lists
 * Topological sorting: `tsort`
+
+---
+
+## Queue
+
+### Ideas
+* Redis:
+    * Use redis-cli to manage queue
+* Name files after processes a la `bq`
+* Daemonize a "listener"
+    * Could also use FIFO, but this is not very robust
+
+### Functions
+* set
+    * Set default queue
+* cat
+* grep
+* sort
+    * sortby
+* rank
+* join
+* map
+    * printf
+* filter
+* select
+* append
+    * (column)
+* style
+    * Set markup style, delimiter, etc.
+    * qconfig
+* include
+    * Sets config options if included file is .conf or .yaml
+* merge
+* split
+* edit
+* next
+* pop, push, peek
+* remove
+* defer
+* transaction
+    * revert
+    * commit
+    * schedule
+    * `task`
+
+
+q() { :; }
+qconfig() { :; }
+qmaybe() { :; }
+qrate() { :; }
+qdo() { :; }
+qrun() { :; }
+qmod() { :; }
+qdef() { :; }
+qinclude() { :; }
+qreverse() { :; }
+qpop() { :; }
+qpush() { :; }
+qswitch() { :; }
+qfile() { :; }
+qprintf() { :; }
+qlog() { :; }
+qmake() { :; }
+qsort() { :; }
+qput() { :; }
+qadd() { :; }
+qgroup() { :; }
+qsplit() { :; }
+
+qdump() { :; }
+qgrep() { :; }
