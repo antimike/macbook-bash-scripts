@@ -1,0 +1,217 @@
+#!/bin/bash
+# Dumped from TTY via `declare -pf ...`
+
+export Q_BACKUP_SUFFIX='~'
+
+#########################################
+## Queue versions of standard *nix tools
+#########################################
+
+qpwd() {
+    echo "$QDIR"
+}
+
+qls() {
+    find "$QDIR" -name "*.q" -type f -printf '%P\n'
+}
+
+qmk() {
+    if [ $# -eq 0 ] || [ -z "$1" ]; then
+        echo "A name is required to create a queue" >&2
+    fi
+    local qfile="${QDIR}/${1}.q"
+    [ -e "$qfile" ] && {
+        _yesno "Queue '${qfile}' exists, overwrite?" &&
+            rm "$qfile" ||
+            { echo "Aborted!" >&2; return 2; }
+        }
+    touch "$qfile" && {
+        export QNAME="$1" QFILE="$qfile"
+        return 0
+    } || {
+        echo "Cannot touch file '${qfile}'" >&2
+        return 1
+    }
+}
+
+qtee() {
+    # Appends to queue file and echoes to stdout
+    printf '%s\n' "$@" | tee -a "$QFILE"
+}
+
+qcd() {
+    # Set global variable $QDIR
+    # Assumptions: $QDIR must already exist, be a directory, and be a git repo.
+    if [ $# -gt 0 ]; then
+        if [ -d "$1" ]; then
+            if ! [ -d "$1/.git" ]; then
+                _yesno "\$QDIR must be a git repo.
+Initialize empty repository in '$1'?" ||
+                    { echo "Aborted" >&2; return 2; }
+            fi
+            export QDIR="$1"
+        else
+            echo "Directory '$1' does not exist" >&2
+            return -1
+        fi
+    else
+        echo "$QDIR"
+        return 0
+    fi
+}
+
+qtouch() {
+    for arg in "$@"; do
+        touch "${QDIR}/${arg}.q"
+    done
+}
+
+qcat() {
+    if [ $# -eq 0 ]; then
+        cat "$QFILE"
+    else
+        cat $(printf "${QDIR}/%s.q" "$@")
+    fi
+}
+alias qdump='qcat'
+
+qgrep() {
+    local -a terms=( )
+    while getopts ":e:" opt; do
+        case "$opt" in
+            e) terms+=( -e "$OPTARG" ) ;;
+            *) echo "Unknown option" >&2; return 1 ;;
+        esac
+    done
+    shift $(( OPTIND - 1 ))
+    if [ ${#terms[@]} -eq 0 ]; then
+        [ $# -eq 0 ] && { echo "No search term specified" >&2; return 2; }
+        terms+=( "$1" ) && shift
+    fi
+    grep "${terms[@]}" $(printf "${QDIR}/%s.q" "$@")
+}
+
+qfind() {
+    # TODO: Implement (just wrap GNU find)
+    :
+}
+
+qrev() {
+    # Reverse queue
+    :
+}
+
+qedit() {
+    # Open queue in $EDITOR
+    $EDITOR "$QFILE"
+}
+
+alias qgit='git --git-dir="$QDIR"'
+
+#######################################
+## Queue- and stack-specific functions
+#######################################
+
+qrank() { 
+    local suffix='~'
+    local delim='	'
+    local -i rating="$1";
+    shift;
+    local re="$*";
+    cp "$f" "${f}${suffix}" && awk -v r=$rating -v OFS="$delim" \
+        "/${re}/{\$2 = r;} {print \$0;}" "${f}${suffix}" >"$f"
+}
+
+qrun () { 
+    local template="$1";
+    local cmd=;
+    while read -r line; do
+        cmd="$(printf "$template" "$line")";
+        eval $cmd;
+    done < $f
+}
+
+qcomment () { 
+    printf '# %s\n' "$@" >> $f
+}
+
+qclear () { 
+    rm "$f" && touch "$f"
+}
+
+qfrom() {
+    # Idea: Create a queue from a collection of other files, e.g. by grepping
+    # for 'todo' items
+    :
+}
+
+qsub() {
+    # Substitute text using sed
+    :
+}
+
+qgroup() {
+    # Group queue nodes together under a single parent node
+    :
+}
+
+qinclude() {
+    # Import another queue's metadata
+    :
+}
+
+qflat() {
+    # Topologically sort an arbitrarily nested queue
+    :
+}
+
+##########################################
+## Metadata- and markup-related functions
+##########################################
+
+_qheader() {
+    cat <<-QHEAD
+name: "$QNAME"
+includes:
+style: UNIX
+delimiter: "	"
+recipes:
+columns:
+comments:
+transactions:
+QHEAD
+}
+
+_qhist_append() {
+    # Appends lines to history
+    [ -r "$QFILE" ] || _qerror "Cannot read %Q"
+    printf '\n%s' "$@" >>"${QFILE}"
+}
+
+_start_transaction() {
+    _qhist_append "" "--- Transaction"
+}
+
+_qcommit() {
+    local summary=
+    local details=
+    pushd "$QDIR"
+    if [ -d ".git" ]; then
+        git add "$QFILE"
+        git commit
+    else
+        :
+    fi
+}
+
+################################
+## Utility functions (internal)
+################################
+
+_qerror() {
+    # Prints error message to stderr and returns -1
+    # Supports rudimentary templating: %Q is replaced by "queue '${QFILE}'"
+    local msg="$(sed "s/%Q/queue '${QFILE}'/g" <<<"$*")"
+    echo "ERROR: $(caller 0): ${msg}"
+    return -1
+} >&2
