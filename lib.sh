@@ -7,11 +7,9 @@ declare -A WARNINGS=( )
 _warn() {
     # Preserve information about previous call
     local -i status=$?
-    if [ -n "${TEST+x}" ]; then
-        local caller="${BASH_SOURCE[0]}: ${FUNCNAME[1]} @${BASH_LINENO[0]}"
-        WARNINGS["$caller"]="$*"
-        echo "WARNING: ${caller}: $*" >&2
-    fi
+    local caller="${BASH_SOURCE[0]}: ${FUNCNAME[1]} @${BASH_LINENO[0]}"
+    WARNINGS["$caller"]="$*"
+    echo "WARNING: ${caller}: $*" >&2
     return $status
 }
 
