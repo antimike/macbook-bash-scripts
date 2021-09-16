@@ -44,6 +44,8 @@ queue() {
     local -a files=( )
     local -a notfound=( )
     local show=0 show_hist=0 edit=0 search=0
+#    local parsed="$(getopt -o "f:q:lHSeh" \
+#        --long "file:,queue:,list,history,search,edit,help"
     while getopts ":f:q:lHSeh" opt; do
         case "$opt" in 
             f)
