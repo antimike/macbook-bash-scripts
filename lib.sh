@@ -13,6 +13,36 @@ _warn() {
     return $status
 }
 
+_map_array() {
+    local fn="$1"
+    local -n arr="$2"
+    local -i _i=0
+    while [ $_i -lt ${#arr[@]} ]; do
+        arr[$_i]="$($fn "${arr[$_i]}")"
+    done
+}
+
+_map_keys() {
+    local fn="$1" mapped=
+    local -n dict="$2"
+    local -a keys=( "${!dict[@]}" )
+    for key in "${keys[@]}"; do
+        mapped="$($fn "$key")"
+        if ! [ "$mapped" == "$key" ]; then
+            dict["$mapped"]="${dict[$key]}"
+            unset dict["$key"]
+        fi
+    done
+}
+
+_map_values() {
+    local fn="$1"
+    local -n dict="$2"
+    for key in "${!dict[@]}"; do
+        dict[$key]="$($fn "${dict[$key]}")"
+    done
+}
+
 _print_array() {
     local -i quoted=1
     if [ "$1" = "-Q" ]; then
