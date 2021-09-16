@@ -14,7 +14,7 @@ export DEFAULT_LIST="${NOTES_DIR}/today.${DEFAULT_EXT}"
 export CURRENT_LIST="$DEFAULT_LIST"
 
 if ! [ -d "$NOTES_DIR" ]; then
-	echo "WARNING: Directory \$NOTES_DIR='${NOTES_DIR}' does not appear to exist."
+    echo "WARNING: Directory \$NOTES_DIR='${NOTES_DIR}' does not appear to exist."
 fi >&2
 
 _set_current_list() {
@@ -64,8 +64,10 @@ _set_current_list() {
 }
 
 _commit_current_list() {
-    git add "$CURRENT_LIST" &&
-        git commit $(printf -- '-m "%s"' "$@") ||
+    pushd "$NOTES_DIR" >/dev/null &&
+        git add "$CURRENT_LIST" &&
+        eval git commit "$(printf -- ' -m "%s" ' "$@")" && 
+        popd >/dev/null ||
         _warn "Failed to commit '${CURRENT_LIST}'"
 }
 
@@ -115,11 +117,12 @@ finish() {
 
 to() { 
     # Adds item to specified TODO list
-    _set_current_list "$1" && {
+    _set_current_list "$1" || _warn "Could not set todo list to '$1'" && {
         shift 
         printf -- '- [ ] %s\n' "$@" | tee -a "$CURRENT_LIST"
-        _commit_current_list
-    } || _warn "Could not set todo list to '$1'"
+        _commit_current_list "Added items to list '${CURRENT_LIST}'" \
+            "$(printf -- '%s\n' "$@")"
+    }
     return $?
 }
 
