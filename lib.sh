@@ -14,32 +14,150 @@ _warn() {
 }
 
 _map_array() {
-    local fn="$1"
-    local -n arr="$2"
+    local -n _arr_="$1" && shift || return -1
+    local -a fn=( "$@" )
     local -i _i=0
-    while [ $_i -lt ${#arr[@]} ]; do
-        arr[$_i]="$($fn "${arr[$_i]}")"
+    while [ $_i -lt ${#_arr_[@]} ]; do
+        _arr_[$_i]="$(${fn[@]} "${_arr_[$_i]}")"
+        let _i+=1
     done
 }
 
 _map_keys() {
-    local fn="$1" mapped=
-    local -n dict="$2"
-    local -a keys=( "${!dict[@]}" )
+    local -n _dict_="$1" && shift || return -1
+    local -a fn=( "$@" ) keys=( "${!_dict_[@]}" )
+    local _mapped_=
     for key in "${keys[@]}"; do
-        mapped="$($fn "$key")"
-        if ! [ "$mapped" == "$key" ]; then
-            dict["$mapped"]="${dict[$key]}"
-            unset dict["$key"]
+        _mapped_="$(${fn[@]} "$key")"
+        if ! [ "$_mapped_" == "$key" ]; then
+            _dict_["$_mapped_"]="${_dict_[$key]}"
+            unset _dict_[$key]
         fi
     done
 }
 
 _map_values() {
-    local fn="$1"
-    local -n dict="$2"
-    for key in "${!dict[@]}"; do
-        dict[$key]="$($fn "${dict[$key]}")"
+    local -n _dict_="$1" && shift || return -1
+    local -a fn=( "$@" )
+    for key in "${!_dict_[@]}"; do
+        _dict_[$key]="$(${fn[@]} "${_dict_[$key]}")"
+    done
+}
+
+_print_markup_recursive() (
+    # Generic function for printing strings, variables, arrays, and associative
+    # arrays
+    # Formatters can be specified as arguments to the same options the `declare`
+    # builtin takes (i.e., -i -A -a -n -r...)
+    # Each such argument is interpreted as a function to be applied to the
+    # passed variable(s) of the corresponding type
+
+    # Can't use associative array because order matters
+    local -a handlers=( ) _print_args=( )
+    # Generic handler (i.e., for anything other than arrays, ints, etc.)
+    local generic=
+
+    _recurse() {
+        # Helper to recursively print array / assoc. array elements
+        local type="$1" handler="$3"
+        local -n val="$2"
+        case "$1" in
+            *a*) 
+                local -a mapped=( "${val[@]}" )
+                _map_array mapped _print_markup_recursive "${handlers[@]}"
+                $handler mapped
+                ;;
+            *A*) 
+                local -A mapped=( )
+                for k in "${!val[@]}"; do mapped[$k]="${val[$k]}"; done
+                _map_values mapped _print_markup_recursive "${handlers[@]}"
+                $handler mapped
+                ;;
+            *) 
+                $handler "$val" 
+                ;;
+        esac
+    }
+
+    while true; do
+        case "$1" in
+            --)
+                shift
+                break
+                ;;
+            -v|-g)
+                generic="$2"
+                shift 2
+                ;;
+            -*) 
+                handlers+=( "${1#*-}" "$2" )
+                shift 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    type "$generic" >/dev/null 2>&1 || generic="declare -p"
+
+    for arg in "$@"; do
+        # Try treating arg as reference variable
+        local -n ref="$arg" 2>/dev/null && [ -n "${ref+x}" ] && {
+            local kind="$(declare -p "${!ref}" 2>/dev/null | cut -f2)"
+            local -i idx=0
+            while [ $idx -lt ${#handlers[@]} ]; do
+                [[ "$kind" == *"${handlers[$idx]}"* ]] && break
+                let idx+=2
+            done
+            local handler="${handlers[$(( idx+1 ))]}"
+            if type "$handler" >/dev/null 2>&1; then
+                handler="$generic"
+            fi
+            _recurse "$kind" ref "$handler"
+        } || {
+            # If reference logic fails, just print the value of the arg
+            $generic "$arg" 2>/dev/null || echo "$arg"
+        }
+    done
+    return $?
+)
+
+_jsonify() {
+    # Prints a Bash associative array as a JSON object (for passing to JQ, e.g.)
+    # Options:
+    #   -q      Quote values as well as keys (default is nonquoted values)
+    local delim='' kdelim='"'
+    local -A opts=( )
+    case "$1" in 
+        -*) opts[$1]=1; shift ;;
+    esac
+    if [ -n "${opts[-q]}" ]; then
+        delim="$kdelim"
+    fi
+    local -n ref="$1"
+
+    local kind="$(declare -p "${!ref}" >/dev/null 2>&1 |
+        cut -f2)"
+    case "$kind" in
+        -*a*)       # Regular array
+            {
+                for item in "${ref[@]}"; do
+                    printf "${delim}%s${delim}," "$(_jsonify)"
+                done
+            printf '['
+            printf "${delim}%s${delim}," "${ref[@]}" |
+                sed 's/,$//'
+            printf ']'
+        }
+            ;;
+    esac
+    for k in "${!ref[@]}"; do
+        local val="${ref[$k]}"
+        if declare -p "$val" >/dev/null 2>&1; then
+            val="$(_jsonify "$val")"
+        fi
+        printf "${kdelim}%s${kdelim}:${delim}%s${delim}," "$k" "${ref[$k]}"
     done
 }
 
