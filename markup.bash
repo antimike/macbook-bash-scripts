@@ -32,6 +32,14 @@ _map_values() {
     done
 }
 
+_map_items() {
+    local -n _dict_="$1" && shift || return -1
+    local -a fn=( "$@" )
+    for key in "${!_dict_[@]}"; do
+        ${fn[@]} "$key" "${_dict_[$key]}"
+    done
+}
+
 _transform() (
     # Generic function for printing strings, variables, arrays, and associative
     # arrays
@@ -52,6 +60,7 @@ _transform() (
         local type="$1" 
         local -n val="$2" && shift 2
         local -a handler=( "$@" )
+        local opts="$(for k in "${!handlers[@]}"; do :; done)"
         case "$1" in
             *a*) 
                 _map_array val _transform ${handlers[@]@K} --
