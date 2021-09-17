@@ -3,20 +3,22 @@
 
 _map_array() {
     local -n _arr_="$1" && shift || return -1
-    local -a fn=( "$@" )
+    local -a fn=( "${@@Q}" )
+    if [ ${#fn[@]} -eq 0 ]; then fn+=( "echo" ); fi
     local -i _i=0
     while [ $_i -lt ${#_arr_[@]} ]; do
-        _arr_[$_i]="$(${fn[@]} "${_arr_[$_i]}")"
+        _arr_[$_i]="$(eval ${fn[@]} "${_arr_[$_i]}")"
         let _i+=1
     done
 }
 
 _map_keys() {
     local -n _dict_="$1" && shift || return -1
-    local -a fn=( "$@" ) keys=( "${!_dict_[@]}" )
+    local -a fn=( "${@@Q}" ) keys=( "${!_dict_[@]}" )
+    if [ ${#fn[@]} -eq 0 ]; then fn+=( "echo" ); fi
     local _mapped_=
     for key in "${keys[@]}"; do
-        _mapped_="$(${fn[@]} "$key")"
+        _mapped_="$(eval ${fn[@]} "$key")"
         if ! [ "$_mapped_" == "$key" ]; then
             _dict_["$_mapped_"]="${_dict_[$key]}"
             unset _dict_[$key]
@@ -26,17 +28,19 @@ _map_keys() {
 
 _map_values() {
     local -n _dict_="$1" && shift || return -1
-    local -a fn=( "$@" )
+    local -a fn=( "${@@Q}" )
+    if [ ${#fn[@]} -eq 0 ]; then fn+=( "echo" ); fi
     for key in "${!_dict_[@]}"; do
-        _dict_[$key]="$(${fn[@]} "${_dict_[$key]}")"
+        _dict_[$key]="$(eval ${fn[@]} "${_dict_[$key]}")"
     done
 }
 
 _map_items() {
     local -n _dict_="$1" && shift || return -1
-    local -a fn=( "$@" )
+    local -a fn=( "${@@Q}" )
+    if [ ${#fn[@]} -eq 0 ]; then fn+=( "echo" ); fi
     for key in "${!_dict_[@]}"; do
-        ${fn[@]} "$key" "${_dict_[$key]}"
+        eval ${fn[@]} "$key" "${_dict_[$key]}"
     done
 }
 
@@ -63,11 +67,11 @@ _transform() (
         local opts="$(for k in "${!handlers[@]}"; do :; done)"
         case "$1" in
             *a*) 
-                _map_array val _transform ${handlers[@]@K} --
+                _map_array val _transform `_map_items handlers printf '%s %s'`
                 ${handler[@]} "${!val}"
                 ;;
             *A*) 
-                _map_values val _transform ${handlers[@]@K} --
+                _map_values val _transform `_map_items handlers printf '%s %s'`
                 ${handler[@]} "${!val}"
                 ;;
             *) 
