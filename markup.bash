@@ -52,7 +52,9 @@ _transform() (
     # Each such argument is interpreted as a function to be applied to the
     # passed variable(s) of the corresponding type
 
-    # Can't use associative array because order matters
+    # Make sure infinite recursive loops fail
+    export FUNCNEST=10
+
     local -A handlers=( )
     local -a handler=( )
 
@@ -61,21 +63,21 @@ _transform() (
 
     _recurse() (
         # Helper to recursively print array / assoc. array elements
-        local type="$1" 
-        local -n val="$2" && shift 2
+        local -n val="$1" && shift
         local -a handler=( "$@" )
-        local opts="$(for k in "${!handlers[@]}"; do :; done)"
-        case "$1" in
+        local -a opts=( ${handlers[@]@K} )
+        case "${val@a}" in
             *a*) 
-                _map_array val _transform `_map_items handlers printf '%s %s'`
-                ${handler[@]} "${!val}"
+                _map_array val _transform ${opts[@]} --
+                eval ${handler[@]} "${val[@]}"
                 ;;
             *A*) 
-                _map_values val _transform `_map_items handlers printf '%s %s'`
-                ${handler[@]} "${!val}"
+                _map_values val _transform ${opts[@]} --
+                # ${handler[@]} "${!val}"
+                eval ${handler[@]} "${val[@]@K}"
                 ;;
             *) 
-                ${handler[@]} "${!val}" 
+                eval ${handler[@]} "${!val}"
                 ;;
         esac
     )
@@ -89,7 +91,7 @@ _transform() (
             -*) 
                 local kind="$1"; shift
                 while ! [[ "$1" == -* ]]; do
-                    handlers[$kind]+="$1"
+                    handlers[$kind]+=" ${1@Q}"
                     shift
                 done
                 ;;
@@ -99,32 +101,30 @@ _transform() (
         esac
     done
 
-    # echo "generic --> ${#generic[@]} elements"
-    echo "${handlers[@]@K}" >&2
-
     if [ ${#generic[@]} -eq 0 ]; then
         generic=( "declare" "-p" )
     fi
 
+    # echo "${handlers[@]@K}" >&2
+
     for arg in "$@"; do
         handler=( )
-        # Try treating arg as reference variable
-        local -n ref="$arg" 2>/dev/null && [ -n "${ref+x}" ] && {
-            local kind="$(declare -p "${!ref}" 2>/dev/null | cut -f2)"
+        # First try dereferencing arg
+        if local -n ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
             for k in "${!handlers[@]}"; do
-                if [[ "$kind" == -*"${handlers[$k]#-}"* ]]; then
+                # Param expansion ${var@a} --> prints attributes of $var
+                if [[ "${k#-}" == *"${ref@a}"* ]]; then
                     handler=( ${handlers[$k]} )
                 fi
             done
             if [ ${#handler[@]} -eq 0 ]; then
                 handler=( ${generic[@]} )
             fi
-            _recurse "$kind" ref "${handler[@]}"
-        } || {
+            _recurse ref ${handler[@]}
+        else
             # If reference logic fails, just print the value of the arg
-            # $generic "$arg" 2>/dev/null || echo "$arg"
             echo "$arg"
-        }
+        fi
     done
     return $?
 )
