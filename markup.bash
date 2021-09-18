@@ -64,19 +64,25 @@ _transform() (
     _recurse() (
         # Helper to recursively print array / assoc. array elements
         local -n val="$1" && shift
-        local -a handler=( "$@" )
+        local -a handler=( $@ )
         local -a opts=( ${handlers[@]@K} )
         case "${val@a}" in
             *a*) 
-                _map_array val _transform ${opts[@]} --
+                echo "Recursing into array ${!val}='${val[@]}'..." >&2
+                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
+                eval _map_array val _transform ${opts[@]} --
                 eval ${handler[@]} "${val[@]}"
                 ;;
             *A*) 
-                _map_values val _transform ${opts[@]} --
+                echo "Recursing into associative array ${!val}='${val[@]@K}'..." >&2
+                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
+                eval _map_values val _transform ${opts[@]} --
                 # ${handler[@]} "${!val}"
                 eval ${handler[@]} "${val[@]@K}"
                 ;;
             *) 
+                echo "Handling plain value ${!val}='${val}'..." >&2
+                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
                 eval ${handler[@]} "${!val}"
                 ;;
         esac
@@ -89,14 +95,15 @@ _transform() (
                 break
                 ;;
             -*) 
-                local kind="$1"; shift
+                local kind="$1"; shift;
+                # handlers[$kind]="${2@Q}"; shift 2
                 while ! [[ "$1" == -* ]]; do
                     handlers[$kind]+=" ${1@Q}"
                     shift
                 done
                 ;;
             *)
-                generic+=( $1 ); shift
+                generic+=( ${1@Q} ); shift
                 ;;
         esac
     done
@@ -114,13 +121,16 @@ _transform() (
             for k in "${!handlers[@]}"; do
                 # Param expansion ${var@a} --> prints attributes of $var
                 if [[ "${k#-}" == *"${ref@a}"* ]]; then
-                    handler=( ${handlers[$k]} )
+                    eval handler=( ${handlers[$k]} )
+                    # eval local x="${handlers[$k]}"
                 fi
             done
             if [ ${#handler[@]} -eq 0 ]; then
-                handler=( ${generic[@]} )
+                eval handler=( ${generic[@]} )
+                # eval x="${generic[*]}"
             fi
             _recurse ref ${handler[@]}
+            # _recurse ref "$x"
         else
             # If reference logic fails, just print the value of the arg
             echo "$arg"
