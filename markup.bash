@@ -56,10 +56,10 @@ _transform() (
     export FUNCNEST=10
 
     local -A handlers=( )
-    local -a handler=( )
+    local handler=
 
     # Generic handler (i.e., for anything other than arrays, ints, etc.)
-    local -a generic=( )
+    local generic=
 
     _recurse() (
         # Helper to recursively print array / assoc. array elements
@@ -98,38 +98,41 @@ _transform() (
                 local kind="$1"; shift;
                 # handlers[$kind]="${2@Q}"; shift 2
                 while ! [[ "$1" == -* ]]; do
-                    handlers[$kind]+=" ${1@Q}"
+                    handlers[$kind]+=" ${1@Q} "
                     shift
                 done
                 ;;
             *)
-                generic+=( ${1@Q} ); shift
+                generic+=" ${1@Q} "; shift;
                 ;;
         esac
     done
 
-    if [ ${#generic[@]} -eq 0 ]; then
-        generic=( "declare" "-p" )
+    if [ -z "$generic" ]; then
+        generic="declare -p"
     fi
 
     # echo "${handlers[@]@K}" >&2
+    local -n ref
 
     for arg in "$@"; do
-        handler=( )
+        handler=
         # First try dereferencing arg
-        if local -n ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
+        # Param expansion ${var@a} --> prints attributes of $var
+        if ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
             for k in "${!handlers[@]}"; do
-                # Param expansion ${var@a} --> prints attributes of $var
                 if [[ "${k#-}" == *"${ref@a}"* ]]; then
-                    eval handler=( ${handlers[$k]} )
+                    # eval handler=( ${handlers[$k]} )
                     # eval local x="${handlers[$k]}"
+                    handler="${handlers[$k]}"
                 fi
             done
-            if [ ${#handler[@]} -eq 0 ]; then
-                eval handler=( ${generic[@]} )
+            if [ -z "$handler" ]; then
+                # eval handler=( ${generic[@]} )
                 # eval x="${generic[*]}"
+                handler="$generic"
             fi
-            _recurse ref ${handler[@]}
+            _recurse ref "$handler"
             # _recurse ref "$x"
         else
             # If reference logic fails, just print the value of the arg
