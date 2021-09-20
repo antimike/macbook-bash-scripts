@@ -125,7 +125,8 @@ _transform() (
         handler=
         # First try dereferencing arg
         # Param expansion ${var@a} --> prints attributes of $var
-        if local -n ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
+        if local -n ref="$arg" 2>/dev/null && 
+            declare -p "${!ref}" >/dev/null 2>&1; then 
             for k in "${!handlers[@]}"; do
                 if [[ "${k#-}" == *"${ref@a}"* ]]; then
                     # eval handler=( ${handlers[$k]} )
