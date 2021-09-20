@@ -72,8 +72,8 @@ _transform() (
                 # echo "Recursing into array ${!val}='${val[@]}'..." >&2
                 # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
                 _map_array val _transform ${opts[@]} -- &&
-                    ${handler[@]} "${val[@]}" 2>/dev/null ||
-                    ${handler[@]} "${!val}" 2>/dev/null ||
+                    eval ${handler[@]} "${val[@]}" 2>/dev/null ||
+                    eval ${handler[@]} "${!val}" 2>/dev/null ||
                     { echo "Could not recurse into array ${!val}" >&2; 
                         return 1; }
                 ;;
@@ -81,16 +81,16 @@ _transform() (
                 # echo "Recursing into associative array ${!val}='${val[@]@K}'..." >&2
                 # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
                 _map_values val _transform ${opts[@]} -- &&
-                    ${handler[@]} "${val[@]@K}" 2>/dev/null ||
-                    ${handler[@]} "${!val}" 2>/dev/null ||
+                    eval ${handler[@]} ${val[@]@K} 2>/dev/null ||
+                    eval ${handler[@]} "${!val}" 2>/dev/null ||
                     { echo "Could not recurse into associative array ${!val}" >&2; 
                         return 1; }
                 ;;
             *) 
                 # echo "Handling plain value ${!val}='${val}'..." >&2
                 # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
-                ${handler[@]} "$val" 2>/dev/null ||
-                    ${handler[@]} "${!val}" 2>/dev/null ||
+                eval ${handler[@]} "$val" 2>/dev/null ||
+                    eval ${handler[@]} "${!val}" 2>/dev/null ||
                     { echo "Failed to apply handler '${handler[@]}' to value ${!val}='$val'" >&2;
                         return 1; }
                 ;;
@@ -107,7 +107,7 @@ _transform() (
                 local kind="$1"; shift;
                 # handlers[$kind]="${2@Q}"; shift 2
                 while ! [[ "$1" == -* ]]; do
-                    handlers[$kind]+=" ${1} "
+                    handlers[$kind]+=" ${1@Q} "
                     shift
                 done
                 ;;
