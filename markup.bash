@@ -124,23 +124,17 @@ _transform() (
     for arg in "$@"; do
         handler=
         # First try dereferencing arg
-        # Param expansion ${var@a} --> prints attributes of $var
         if local -n ref="$arg" 2>/dev/null && 
             declare -p "${!ref}" >/dev/null 2>&1; then 
             for k in "${!handlers[@]}"; do
                 if [[ "${k#-}" == *"${ref@a}"* ]]; then
-                    # eval handler=( ${handlers[$k]} )
-                    # eval local x="${handlers[$k]}"
                     handler="${handlers[$k]}"
                 fi
             done
             if [ -z "$handler" ]; then
-                # eval handler=( ${generic[@]} )
-                # eval x="${generic[*]}"
                 handler="$generic"
             fi
             _recurse ref "$handler"
-            # _recurse ref "$x"
         else
             # If reference logic fails, just print the value of the arg
             echo "$arg"
