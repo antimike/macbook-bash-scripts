@@ -58,7 +58,8 @@ _transform() (
     local -A handlers=( )
     local handler=
 
-    # Generic handler (i.e., for anything other than arrays, ints, etc.)
+    # Generic handlers (i.e., fallbacks to use when variable type has no
+    # associated handler)
     local generic=
 
     _recurse() (
@@ -120,14 +121,11 @@ _transform() (
         generic="declare -p"
     fi
 
-    # echo "${handlers[@]@K}" >&2
-    local -n ref
-
     for arg in "$@"; do
         handler=
         # First try dereferencing arg
         # Param expansion ${var@a} --> prints attributes of $var
-        if ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
+        if local -n ref="$arg" 2>/dev/null && [ -n "${ref@a}" ]; then 
             for k in "${!handlers[@]}"; do
                 if [[ "${k#-}" == *"${ref@a}"* ]]; then
                     # eval handler=( ${handlers[$k]} )
