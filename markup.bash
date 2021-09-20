@@ -68,22 +68,30 @@ _transform() (
         local -a opts=( ${handlers[@]@K} )
         case "${val@a}" in
             *a*) 
-                echo "Recursing into array ${!val}='${val[@]}'..." >&2
-                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
-                eval _map_array val _transform ${opts[@]} --
-                eval ${handler[@]} "${val[@]}"
+                # echo "Recursing into array ${!val}='${val[@]}'..." >&2
+                # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
+                _map_array val _transform ${opts[@]} -- &&
+                    ${handler[@]} "${val[@]}" 2>/dev/null ||
+                    ${handler[@]} "${!val}" 2>/dev/null ||
+                    { echo "Could not recurse into array ${!val}" >&2; 
+                        return 1; }
                 ;;
             *A*) 
-                echo "Recursing into associative array ${!val}='${val[@]@K}'..." >&2
-                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
-                eval _map_values val _transform ${opts[@]} --
-                # ${handler[@]} "${!val}"
-                eval ${handler[@]} "${val[@]@K}"
+                # echo "Recursing into associative array ${!val}='${val[@]@K}'..." >&2
+                # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
+                _map_values val _transform ${opts[@]} -- &&
+                    ${handler[@]} "${val[@]@K}" 2>/dev/null ||
+                    ${handler[@]} "${!val}" 2>/dev/null ||
+                    { echo "Could not recurse into associative array ${!val}" >&2; 
+                        return 1; }
                 ;;
             *) 
-                echo "Handling plain value ${!val}='${val}'..." >&2
-                printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
-                eval ${handler[@]} "${!val}"
+                # echo "Handling plain value ${!val}='${val}'..." >&2
+                # printf '%s\n' "${opts[*]@A}" "${handler[*]@A}" >&2
+                ${handler[@]} "$val" 2>/dev/null ||
+                    ${handler[@]} "${!val}" 2>/dev/null ||
+                    { echo "Failed to apply handler '${handler[@]}' to value ${!val}='$val'" >&2;
+                        return 1; }
                 ;;
         esac
     )
@@ -98,12 +106,12 @@ _transform() (
                 local kind="$1"; shift;
                 # handlers[$kind]="${2@Q}"; shift 2
                 while ! [[ "$1" == -* ]]; do
-                    handlers[$kind]+=" ${1@Q} "
+                    handlers[$kind]+=" ${1} "
                     shift
                 done
                 ;;
             *)
-                generic+=" ${1@Q} "; shift;
+                generic+=" ${1} "; shift;
                 ;;
         esac
     done
