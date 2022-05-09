@@ -27,6 +27,11 @@ _map_keys() {
 }
 
 _map_values() {
+    # Updates a dictionary (i.e., associative array) in-place using the passed
+    # callback function
+    # Params:
+    #   $1          : Name of associative array to update
+    #   ${@[@]:2:}  : Update function.  If none is provided, 'echo' is used
     local -n _dict_="$1" && shift || return -1
     local -a fn=( "${@@Q}" )
     if [ ${#fn[@]} -eq 0 ]; then fn+=( "echo" ); fi
@@ -55,7 +60,10 @@ _transform() (
     # Make sure infinite recursive loops fail
     export FUNCNEST=10
 
-    local -A handlers=( )
+    local -A handlers=( 
+        [-a]="declare -p"
+        [-A]="declare -p"
+    )
     local handler=
 
     # Generic handlers (i.e., fallbacks to use when variable type has no
@@ -104,8 +112,7 @@ _transform() (
                 break
                 ;;
             -*) 
-                local kind="$1"; shift;
-                # handlers[$kind]="${2@Q}"; shift 2
+                local kind="$1"; shift; handlers[$kind]=
                 while ! [[ "$1" == -* ]]; do
                     handlers[$kind]+=" ${1@Q} "
                     shift
@@ -118,12 +125,13 @@ _transform() (
     done
 
     if [ -z "$generic" ]; then
-        generic="declare -p"
+        generic="echo"
     fi
 
     for arg in "$@"; do
         handler=
         # First try dereferencing arg
+        # Param expansion ${var@a} --> prints attributes of $var
         if local -n ref="$arg" 2>/dev/null && 
             declare -p "${!ref}" >/dev/null 2>&1; then 
             for k in "${!handlers[@]}"; do
